@@ -699,14 +699,40 @@ with tab2:
     HUES = [210, 158, 28, 286, 338, 176, 56, 258, 14, 128, 50, 194]
     parent_hue = {p: HUES[i % len(HUES)] for i, p in enumerate(sorted_parents)}
 
+    import re as _re
+    _corp_re = _re.compile(
+        r"\(.*?\)"                                           # strip ticker/price
+        r"|\b(plc|ltd|llc|inc|corp|corporation|group|"
+        r"holding|company|co|s\.a\.|n\.v\.)\b"
+        r"|[^a-z0-9 ]",
+        _re.IGNORECASE,
+    )
+    def _clean(s: str) -> str:
+        return _re.sub(r"\s+", " ", _corp_re.sub(" ", s)).strip().lower()
+
+    def _is_self_parent(brand: str, parent_label: str) -> bool:
+        """True when brand and parent are the same entity (e.g. Greggs / Greggs plc)."""
+        cb, cp = _clean(brand), _clean(parent_label)
+        return bool(cb and cp and (cb in cp or cp in cb))
+
     md_lines = ["# London Cafe Ownership"]
     for pl in sorted_parents:
-        safe_p = pl.replace("|", "-").replace("`", "'").replace("$", "")
-        md_lines.append(f"## {safe_p}")
-        for bn in sorted(brand_groups[pl].keys(),
-                         key=lambda x: -brand_groups[pl][x]["mkt_cap"]):
-            safe_b = bn.replace("|", "-").replace("`", "'").replace("$", "")
-            md_lines.append(f"### {safe_b}")
+        brands   = brand_groups[pl]
+        safe_p   = pl.replace("|", "-").replace("`", "'").replace("$", "")
+        # If there's only one brand and it IS the parent (e.g. "Greggs" / "Greggs plc"),
+        # skip the redundant parent wrapper — show the brand directly at ## level.
+        solo_same = (
+            len(brands) == 1
+            and _is_self_parent(next(iter(brands)), pl)
+        )
+        if solo_same:
+            safe_b = next(iter(brands)).replace("|", "-").replace("`", "'").replace("$", "")
+            md_lines.append(f"## {safe_b}")
+        else:
+            md_lines.append(f"## {safe_p}")
+            for bn in sorted(brands.keys(), key=lambda x: -brands[x]["mkt_cap"]):
+                safe_b = bn.replace("|", "-").replace("`", "'").replace("$", "")
+                md_lines.append(f"### {safe_b}")
     markmap_md = "\n".join(md_lines)
 
     colour_map_json = json.dumps({p: parent_hue[p] for p in sorted_parents})
@@ -862,11 +888,16 @@ function waitForMarkmap(n) {{
       .on('mousedown.cur', () => {{ svg.style.cursor = 'grabbing'; }})
       .on('mouseup.cur',   () => {{ svg.style.cursor = 'grab';     }});
 
-    function doFit() {{
+    function doFit(retries) {{
+      // window.innerWidth is always valid inside an iframe; svg.clientWidth
+      // often returns 0 until the browser has completed its first layout pass.
+      const W = window.innerWidth  || {HEIGHT};
+      const H = window.innerHeight || {HEIGHT};
       const b = g ? g.getBBox() : null;
-      const W = svg.clientWidth  || 900;
-      const H = svg.clientHeight || {HEIGHT};
-      if (!b || !b.width || !b.height || !W || !H) return;
+      if (!b || !b.width || !b.height || W < 50) {{
+        if ((retries || 0) > 0) setTimeout(() => doFit(retries - 1), 300);
+        return;
+      }}
       const sc = Math.min(0.90, (W - 60) / b.width, (H - 60) / b.height);
       const tx = (W - b.width  * sc) / 2 - b.x * sc;
       const ty = (H - b.height * sc) / 2 - b.y * sc;
@@ -874,11 +905,12 @@ function waitForMarkmap(n) {{
         .call(zb.transform, d3.zoomIdentity.translate(tx, ty).scale(sc));
     }}
 
-    setTimeout(doFit, 350); // wait for markmap layout to stabilise
+    // First attempt after markmap's initial layout, then retry in case it's still animating
+    setTimeout(() => doFit(4), 350);
 
     document.getElementById('zi').onclick   = () => d3.select(svg).transition().duration(260).call(zb.scaleBy, 1.35);
     document.getElementById('zo').onclick   = () => d3.select(svg).transition().duration(260).call(zb.scaleBy, 0.74);
-    document.getElementById('zfit').onclick = doFit;
+    document.getElementById('zfit').onclick = () => doFit(0);
 
     new MutationObserver(() => setTimeout(recolour, 50))
       .observe(svg, {{ childList:true, subtree:true, attributes:true }});
