@@ -756,6 +756,8 @@ with tab2:
         if _pc and _pc not in ("Independent", "nan") and _ind not in ("None", "nan", ""):
             _pc_industry[_pc] = _ind
 
+    import re as _re
+
     def _parent_name(lbl: str) -> str:
         return _re.sub(r"\s*\([^)]+\)\s*$", "", lbl).strip()
 
@@ -777,7 +779,6 @@ with tab2:
             industry_colors[ind] = parent_hue[pl]
     industry_colors_json = json.dumps(industry_colors)
 
-    import re as _re
     _corp_re = _re.compile(
         r"\(.*?\)"                                           # strip ticker/price
         r"|\b(plc|ltd|llc|inc|corp|corporation|group|"
