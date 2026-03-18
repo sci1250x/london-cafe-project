@@ -113,8 +113,7 @@ BRAND_TO_PARENT: dict[str, tuple[str, str | None]] = {
     "JDE Peet":            ("JDE Peet's N.V.",                      "JDEP.AS"),
     "Nespresso":           ("Nestle S.A.",                          "NESN.SW"),
     "Blue Bottle":         ("Nestle S.A.",                          "NESN.SW"),
-    # SSP Group operates Starbucks under licence in UK travel hubs
-    "Starbucks":           ("SSP Group plc",                        "SSPG.L"),
+    "Starbucks":           ("Starbucks Corporation",                "SBUX"),
     "Upper Crust":         ("SSP Group plc",                        "SSPG.L"),
     "Caffè Ritazza":       ("SSP Group plc",                        "SSPG.L"),
     "Caffe Ritazza":       ("SSP Group plc",                        "SSPG.L"),
@@ -879,13 +878,6 @@ def build_enriched_df(places_df: pd.DataFrame,
 
         for sub in subs:
             if not sub or sub == row["name"]:
-                continue
-            # Skip if this sub is already a first-class brand with its own
-            # parent mapping (e.g. Wikipedia lists Starbucks as an SSP sub
-            # because SSP operates licensed Starbucks in travel hubs — but
-            # Starbucks Corporation is the real owner).
-            canonical_sub = normalise_brand(sub)
-            if canonical_sub and canonical_sub in BRAND_TO_PARENT:
                 continue
             sub_rows.append({
                 "place_id":           None,

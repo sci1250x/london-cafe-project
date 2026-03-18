@@ -710,6 +710,24 @@ with tab2:
         if brand not in brand_groups[label] or mkt_cap > brand_groups[label][brand]["mkt_cap"]:
             brand_groups[label][brand] = {"mkt_cap": mkt_cap, "is_sub": is_sub}
 
+    # Deduplication: if a brand is an explicit SUBSIDIARY under one parent
+    # (e.g. Starbucks under SSP Group per Wikipedia), remove it from any other
+    # parent group where it appears as a regular chain brand.
+    # This means the operating relationship (Wikipedia) wins over the default
+    # brand→parent mapping — no hardcoding required.
+    _sub_brands = {
+        brand
+        for brands in brand_groups.values()
+        for brand, info in brands.items()
+        if info["is_sub"]
+    }
+    for _lbl in list(brand_groups.keys()):
+        for _brand in list(brand_groups[_lbl].keys()):
+            if _brand in _sub_brands and not brand_groups[_lbl][_brand]["is_sub"]:
+                del brand_groups[_lbl][_brand]
+        if not brand_groups[_lbl]:
+            del brand_groups[_lbl]
+
     def _psort(lbl: str) -> tuple:
         if "Private Listing" in lbl: return (2, lbl)   # catch-all independents last
         if "(PRIVATE)" in lbl:       return (1, lbl)   # known private companies
