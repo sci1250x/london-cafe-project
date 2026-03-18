@@ -776,15 +776,31 @@ with tab2:
     markmap_md = "\n".join(md_lines)
 
     colour_map_json = json.dumps({p: parent_hue[p] for p in sorted_parents})
-    cap_ratio_map: dict[str, dict[str, float]] = {
-        pl: {
-            bn: round(info["mkt_cap"] / (max((b["mkt_cap"] for b in brand_groups[pl].values()), default=1) or 1), 3)
-            for bn, info in brand_groups[pl].items()
-            if info["is_sub"]
-        }
-        for pl in sorted_parents
+
+    # cafe_brands: actual London cafe chains (not Wikipedia subsidiaries)
+    # loc_count:   how many locations each cafe brand has (for edge width)
+    cafe_brands_list = [
+        brand
+        for brands in brand_groups.values()
+        for brand, info in brands.items()
+        if not info["is_sub"]
+    ]
+    loc_count_map: dict[str, int] = {}
+    for _, _row in raw_df.iterrows():
+        _b = str(_row.get("brand") or "")
+        if _b and _b not in ("nan", "None", ""):
+            loc_count_map[_b] = loc_count_map.get(_b, 0) + 1
+    cafe_brands_json = json.dumps(cafe_brands_list)
+    loc_count_json   = json.dumps(loc_count_map)
+
+    # sub_parent_map: {subsidiary_brand: parent_label} for Wikipedia subsidiaries
+    sub_parent_map = {
+        bn: pl
+        for pl, brands in brand_groups.items()
+        for bn, info in brands.items()
+        if info["is_sub"]
     }
-    cap_ratio_json = json.dumps(cap_ratio_map)
+    sub_parent_json = json.dumps(sub_parent_map)
 
     md_escaped = (
         markmap_md
@@ -832,10 +848,12 @@ html, body {{ width: 100%; height: {HEIGHT}px; overflow: hidden; font-family: 'S
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/markmap-autoloader@latest"></script>
 <script>
-const dark   = window.matchMedia('(prefers-color-scheme: dark)').matches;
-const colMap = {colour_map_json};
-const capMap = {cap_ratio_json};
-const text   = dark ? '#e6e3db' : '#111111';
+const dark       = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const colMap     = {colour_map_json};
+const subParent  = {sub_parent_json};    // {{subsidiaryBrand: parentLabel}}
+const cafeSet    = new Set({cafe_brands_json});
+const locCount   = {loc_count_json};     // {{cafeBrand: locationCount}}
+const text       = dark ? '#e6e3db' : '#111111';
 
 document.body.style.background = dark ? '#0d0f16' : '#f7f7fa';
 
@@ -847,17 +865,17 @@ document.querySelectorAll('.zb').forEach(b => {{
 }});
 
 function hsl(h,s,l) {{ return `hsl(${{h}},${{s}}%,${{l}}%)`; }}
-function subBlue(r) {{
-  const lo = dark ? [210,58,26] : [204,65,76];
-  const hi = dark ? [218,92,54] : [214,73,40];
-  const f  = (a,b,t) => Math.round(a+(b-a)*t);
-  return hsl(f(lo[0],hi[0],r), f(lo[1],hi[1],r), f(lo[2],hi[2],r));
+
+// Blue scale for actual London cafe chains — brighter/thicker = more locations
+function cafeBlue(ratio) {{
+  const lo = dark ? [212, 62, 36] : [212, 72, 62];
+  const hi = dark ? [216, 90, 62] : [216, 82, 38];
+  const f  = (a,b,t) => Math.round(a + (b-a)*t);
+  return hsl(f(lo[0],hi[0],ratio), f(lo[1],hi[1],ratio), f(lo[2],hi[2],ratio));
 }}
 
 const allParents = new Set(Object.keys(colMap));
-const brandParent = {{}};
-for (const [p, brands] of Object.entries(capMap))
-  for (const b of Object.keys(brands)) brandParent[b] = p;
+const maxLoc     = Math.max(1, ...Object.values(locCount));
 
 function recolour() {{
   const svg = document.querySelector('.markmap svg');
@@ -896,21 +914,29 @@ function recolour() {{
     nodeIdx.forEach(n => {{ const d2=Math.hypot(n.x-tx,n.y-ty); if(d2<minD){{minD=d2;nearest=n;}} }});
     if (!nearest || minD > 80) return;
     const label = nearest.label;
-    let stroke = dark ? '#3a3e4a' : '#c0c0cc', width = '1.5';
-    if (allParents.has(label)) {{ stroke = dark ? '#3a3e4a' : '#c4c4d0'; width = '2'; }}
-    else if (brandParent[label] !== undefined) {{
-      const ratio = (capMap[brandParent[label]] || {{}})[label] ?? 0;
-      stroke = subBlue(ratio); width = String(1.5 + ratio * 2.5);
+
+    let stroke, width, opacity = '0.88';
+    if (allParents.has(label)) {{
+      // Parent company node — neutral connector
+      stroke = dark ? '#3a3e4a' : '#c4c4d0'; width = '2.0';
+    }} else if (cafeSet.has(label)) {{
+      // Actual London cafe chain — blue, width scales with location count
+      const cnt   = locCount[label] || 1;
+      const ratio = Math.min(1, Math.log(cnt + 1) / Math.log(maxLoc + 1));
+      stroke  = cafeBlue(ratio);
+      width   = String((1.6 + ratio * 2.2).toFixed(1));
+      opacity = '0.95';
+    }} else if (subParent[label] !== undefined) {{
+      // Wikipedia subsidiary (not a London cafe) — muted slate
+      stroke = dark ? '#3d4a5e' : '#b0b8cc'; width = '1.2'; opacity = '0.70';
     }} else {{
-      const idx = nodeIdx.indexOf(nearest);
-      const hue = Object.values(colMap)[idx % Object.values(colMap).length] ?? 210;
-      stroke = hsl(hue, dark?48:50, dark?52:48); width = '1.4';
+      stroke = dark ? '#3a3e4a' : '#c0c0cc'; width = '1.4';
     }}
-    path.setAttribute('stroke', stroke);
+    path.setAttribute('stroke',       stroke);
     path.setAttribute('stroke-width', width);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('opacity', '0.88');
+    path.setAttribute('fill',         'none');
+    path.setAttribute('stroke-linecap','round');
+    path.setAttribute('opacity',      opacity);
   }});
 }}
 

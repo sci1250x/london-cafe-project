@@ -882,12 +882,15 @@ def build_enriched_df(places_df: pd.DataFrame,
     expanded_parents: set[str]   = set()
 
     for _, row in df[df["is_listed"] == True].iterrows():
-        pname = row["resolved_name"]
-        if not pname or pname in expanded_parents:
+        # Use parent_company (BRAND_TO_PARENT key) as the canonical identity,
+        # not resolved_name from yfinance — avoids accent mismatches like
+        # "Nestle S.A." vs "Nestlé S.A." creating duplicate parent groups.
+        pname = row["parent_company"]
+        if not pname or pname in expanded_parents or pname == "Independent":
             continue
         expanded_parents.add(pname)
         stock = resolve_ticker(row["ticker_candidate"])
-        subs  = (wiki_data.get(row["parent_company"]) or {}).get("subsidiaries", [])
+        subs  = (wiki_data.get(pname) or {}).get("subsidiaries", [])
 
         for sub in subs:
             if not sub or sub == row["name"]:
