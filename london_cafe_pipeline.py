@@ -380,7 +380,7 @@ def normalise_brand(place_name: str) -> str | None:
 # ─────────────────────────────────────────────────────────────────
 
 # Infobox fields to extract in a single pass
-_SUBS_FIELDS    = {"subsidiaries", "subsidiary"}
+_SUBS_FIELDS    = {"subsidiaries", "subsidiary", "subsid"}
 _REVENUE_FIELDS = {"revenue", "net_income", "assets",
                    "equity", "total_equity", "valuation"}
 
@@ -400,7 +400,9 @@ def _clean_wiki_field(raw: str) -> list[str]:
     """
     if not raw:
         return []
-    raw = re.sub(r"\{\{(?:plain|unbulleted\s+)?list\s*\|(.*?)\}\}",
+    # Handle common list templates: {{plainlist}}, {{plain list}},
+    # {{unbulleted list}}, {{ubl}}, {{flat list}}, {{flatlist}}
+    raw = re.sub(r"\{\{(?:plain\s*list|unbulleted\s+list|ubl|flat\s*list|plainlist)\s*\|(.*?)\}\}",
                  r"\1", raw, flags=re.IGNORECASE | re.DOTALL)
     raw = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]+)\]\]", r"\1", raw)
     raw = re.sub(r"\{\{[^}]*\}\}", "", raw)
@@ -409,7 +411,7 @@ def _clean_wiki_field(raw: str) -> list[str]:
     results = []
     for p in parts:
         p = re.sub(r"\[\d+\]", "", p.strip(" |\t'\"")).strip()
-        if len(p) >= 3:
+        if len(p) >= 3 and not re.match(r"list of\b", p, re.IGNORECASE):
             results.append(p)
     return results
 
@@ -483,20 +485,31 @@ def _wiki_batch_fetch(titles: list[str]) -> dict[str, dict]:
             subs:    list[str]   = []
             est_val: float | None = None
 
-            for line in wikitext.splitlines():
-                stripped = line.strip()
-                if not stripped.startswith("|"):
-                    continue
-                # Extract field name and value
-                m = re.match(r"\|\s*(\w+)\s*=\s*(.*)", stripped)
-                if not m:
-                    continue
-                field = m.group(1).lower()
-                value = m.group(2).strip()
+            # Build a fields dict with multi-line value support.
+            # A field starts with "| name = value" and continues on
+            # subsequent lines until the next "| name =" line.
+            # This correctly captures {{flat list|...}} and {{ubl|...}}
+            # templates that span multiple lines in the wikitext.
+            fields: dict[str, str] = {}
+            cur_field: str | None = None
+            val_lines: list[str]  = []
 
+            for line in wikitext.splitlines():
+                m = re.match(r"^\|\s*(\w+)\s*=\s*(.*)", line)
+                if m:
+                    if cur_field is not None:
+                        fields[cur_field] = "\n".join(val_lines)
+                    cur_field = m.group(1).lower()
+                    val_lines = [m.group(2)]
+                elif cur_field is not None:
+                    val_lines.append(line)
+
+            if cur_field is not None:
+                fields[cur_field] = "\n".join(val_lines)
+
+            for field, value in fields.items():
                 if field in _SUBS_FIELDS and not subs:
                     subs = _clean_wiki_field(value)
-
                 if field in _REVENUE_FIELDS and est_val is None:
                     est_val = _parse_wiki_amount(value)
 
