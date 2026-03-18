@@ -841,8 +841,9 @@ def get_private_valuation(company_name: str) -> float | None:
 
 _TYPE_KEYWORDS: list[tuple[str, set[str]]] = [
     ("Cafe / Coffee",    {"coffee", "cafe", "café", "espresso", "roast", "roasters",
-                          "brew", "brewer", "tea", "teavana", "nespresso", "barista",
-                          "latte", "cappuccino", "cortado", "flat white"}),
+                          "torrefazione", "brew", "brewer", "tea", "teavana",
+                          "nespresso", "barista", "latte", "cappuccino", "cortado",
+                          "flat white"}),
     ("Bakery",           {"bakery", "boulangerie", "boulange", "bread", "patisserie",
                           "pastry", "bagel", "croissant", "donut", "doughnut",
                           "muffin", "brioche", "viennoiserie"}),
@@ -903,11 +904,22 @@ def build_enriched_df(places_df: pd.DataFrame,
     df["ticker_candidate"] = df["brand"].map(
         lambda b: BRAND_TO_PARENT.get(b, (None, None))[1] if b else None
     )
-    # Entity type for chain brands — Google Places "types" field is the
-    # primary cafe signal in app.py; this covers non-cafe classification.
-    df["entity_type"] = df["brand"].apply(
-        lambda b: classify_entity_type(b) if b else "Unknown"
-    )
+    # Entity type for chain brands.
+    # Primary signal: Google Places "types" field (e.g. "cafe", "bakery",
+    # "restaurant").  Falls back to keyword matching on the brand name so
+    # brands like Starbucks (types=cafe) get "Cafe / Coffee" even though
+    # "cafe" doesn't appear in their name.
+    def _chain_entity_type(row) -> str:
+        if not row.get("brand"):
+            return "Unknown"
+        types_lower = str(row.get("types") or "").lower()
+        if "cafe"       in types_lower: return "Cafe / Coffee"
+        if "bakery"     in types_lower: return "Bakery"
+        if "restaurant" in types_lower: return "Restaurant"
+        if "meal_takeaway" in types_lower: return "Sandwich / Deli"
+        return classify_entity_type(str(row["brand"]))
+
+    df["entity_type"] = df.apply(_chain_entity_type, axis=1)
 
     # ── Stage 4: Wikipedia single pass (subs + private valuation) ─
     if progress_cb: progress_cb("Wikipedia: fetching subsidiaries and valuations…", 0.20)
