@@ -829,6 +829,53 @@ def get_private_valuation(company_name: str) -> float | None:
     return val
 
 # ─────────────────────────────────────────────────────────────────
+# STAGE 6b — ENTITY TYPE CLASSIFICATION (free, offline)
+#
+# Classifies any brand/subsidiary name into a broad category using
+# keyword matching. Works for both chain brands and Wikipedia
+# subsidiaries — no API calls, no hardcoding of individual names.
+# The "types" field from Google Places is the primary signal for
+# cafe chains; this function handles everything else (subsidiaries,
+# corporate holdcos, etc.) where no Places types are available.
+# ─────────────────────────────────────────────────────────────────
+
+_TYPE_KEYWORDS: list[tuple[str, set[str]]] = [
+    ("Cafe / Coffee",    {"coffee", "cafe", "café", "espresso", "roast", "roasters",
+                          "brew", "brewer", "tea", "teavana", "nespresso", "barista",
+                          "latte", "cappuccino", "cortado", "flat white"}),
+    ("Bakery",           {"bakery", "boulangerie", "boulange", "bread", "patisserie",
+                          "pastry", "bagel", "croissant", "donut", "doughnut",
+                          "muffin", "brioche", "viennoiserie"}),
+    ("Sandwich / Deli",  {"sub", "subs", "sandwich", "sandwiches", "deli",
+                          "wrap", "wraps", "panini"}),
+    ("Fast Food",        {"burger", "burgers", "chicken", "pizza", "taco",
+                          "tacos", "grill", "bbq", "fries", "wings", "popeyes",
+                          "mcdonalds", "mcdonald"}),
+    ("Restaurant",       {"restaurant", "restaurants", "bistro", "brasserie",
+                          "dining", "kitchen", "eatery", "grill", "steakhouse"}),
+    ("Juice / Health",   {"juice", "smoothie", "smoothies", "health", "wellness",
+                          "fresh", "pressed", "vitality"}),
+    ("Retail / Other",   {"music", "media", "water", "entertainment",
+                          "tech", "digital", "holdings", "partners", "worldwide",
+                          "international", "group", "ventures"}),
+]
+
+
+def classify_entity_type(name: str) -> str:
+    """
+    Classify a brand or subsidiary name into a broad category.
+    Uses ordered keyword matching — first match wins.
+    Falls back to 'Food & Beverage' for unrecognised names.
+    """
+    lower = name.lower()
+    words = set(re.split(r"\W+", lower))
+    for label, keywords in _TYPE_KEYWORDS:
+        if words & keywords or any(k in lower for k in keywords if len(k) > 4):
+            return label
+    return "Food & Beverage"
+
+
+# ─────────────────────────────────────────────────────────────────
 # STAGE 7 — BUILD ENRICHED DATAFRAME
 # ─────────────────────────────────────────────────────────────────
 
@@ -855,6 +902,11 @@ def build_enriched_df(places_df: pd.DataFrame,
     )
     df["ticker_candidate"] = df["brand"].map(
         lambda b: BRAND_TO_PARENT.get(b, (None, None))[1] if b else None
+    )
+    # Entity type for chain brands — Google Places "types" field is the
+    # primary cafe signal in app.py; this covers non-cafe classification.
+    df["entity_type"] = df["brand"].apply(
+        lambda b: classify_entity_type(b) if b else "Unknown"
     )
 
     # ── Stage 4: Wikipedia single pass (subs + private valuation) ─
@@ -915,6 +967,7 @@ def build_enriched_df(places_df: pd.DataFrame,
                 "business_status":    "SUBSIDIARY",
                 "types":              "subsidiary",
                 "brand":              sub,
+                "entity_type":        classify_entity_type(sub),
                 "parent_company":     pname,
                 "ticker_candidate":   row["ticker_candidate"],
                 "ticker":             row["ticker_candidate"],

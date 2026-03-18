@@ -480,7 +480,7 @@ def build_brand_table(df: pd.DataFrame) -> pd.DataFrame:
         "parent_company", "ticker", "exchange", "price_usd",
         "market_cap_bn", "display_mktcap_bn", "pe_ratio",
         "est_private_val_bn", "sector", "industry",
-        "is_listed", "display_label",
+        "is_listed", "display_label", "entity_type",
     ]
 
     # ── Subsidiaries: keep as-is ──────────────────────────────────
@@ -636,7 +636,7 @@ with tab1:
     st.caption(f"Showing {len(view)} brands")
 
     show_cols = [c for c in [
-        "name", "parent_company", "ticker", "exchange",
+        "name", "entity_type", "parent_company", "ticker", "exchange",
         "price_usd", "display_mktcap_bn", "pe_ratio",
         "est_private_val_bn", "sector", "industry",
         "rating", "review_count", "location_count",
@@ -645,6 +645,7 @@ with tab1:
     st.dataframe(
         view[show_cols].rename(columns={
             "name":               "Brand",
+            "entity_type":        "Type",
             "parent_company":     "Parent Company",
             "ticker":             "Ticker",
             "exchange":           "Exchange",
@@ -872,6 +873,16 @@ with tab2:
     }
     sub_parent_json = json.dumps(sub_parent_map)
 
+    # sub_entity_map: {subsidiary_brand: entity_type} — used to bold-blue cafe subs
+    _sub_entity: dict[str, str] = {}
+    for _, _r in raw_df.iterrows():
+        if str(_r.get("business_status", "")) == "SUBSIDIARY":
+            _sb = str(_r.get("brand") or "")
+            _et = str(_r.get("entity_type") or "")
+            if _sb and _sb not in ("nan", "None", ""):
+                _sub_entity[_sb] = _et
+    sub_entity_json = json.dumps(_sub_entity)
+
     # cafe_parent_map: {cafe_brand: parent_label} for actual London cafes
     cafe_parent_map = {
         bn: pl
@@ -930,6 +941,7 @@ html, body {{ width: 100%; height: {HEIGHT}px; overflow: hidden; font-family: 'S
 const dark          = window.matchMedia('(prefers-color-scheme: dark)').matches;
 const colMap        = {colour_map_json};
 const subParent     = {sub_parent_json};       // {{subBrand: parentLabel}}
+const subEntityType = {sub_entity_json};       // {{subBrand: entityType}}
 const cafeParent    = {cafe_parent_json};      // {{cafeBrand: parentLabel}}
 const cafeSet       = new Set({cafe_brands_json});
 const industryColors = {industry_colors_json}; // {{industry: hue}}
@@ -977,14 +989,15 @@ function styleNodes(svg) {{
     const bareLabel = label.replace(/\\s*\\([^)]+\\)\\s*$/, '').trim();
 
     el.style.textUnderlineOffset = '3px';
-    if (cafeSet.has(label) || cafeSet.has(bareLabel)) {{
-      // Actual London cafe — blue bold underline
+    const isCafeSub = subParent[label] !== undefined && subEntityType[label] === 'Cafe / Coffee';
+    if (cafeSet.has(label) || cafeSet.has(bareLabel) || isCafeSub) {{
+      // Actual London cafe OR cafe-type subsidiary — blue bold underline
       el.style.fontWeight             = '700';
       el.style.textDecoration         = 'underline';
       el.style.textDecorationColor    = CAFE_BLUE;
       el.style.textDecorationThickness = '2px';
     }} else if (subParent[label] !== undefined) {{
-      // Wikipedia subsidiary — parent-hue coloured underline
+      // Non-cafe Wikipedia subsidiary — parent-hue coloured underline
       const hue = colMap[subParent[label]] ?? 210;
       el.style.fontWeight             = '400';
       el.style.textDecoration         = 'underline';

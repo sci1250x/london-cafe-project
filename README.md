@@ -93,9 +93,28 @@ Private companies get their valuation estimate from Wikipedia instead.
 
 ---
 
-### Stage 6 — Final DataFrame
+### Stage 6 — Entity Type Classification (free, local)
 
-Everything is joined into a single enriched DataFrame — one row per cafe location — with columns for brand, parent, ticker, price, market cap, rating, review count, and location count. This is the source of truth for both the table and the visual mapping.
+Every brand and Wikipedia subsidiary is classified into a category using keyword matching against its name — no extra API calls required:
+
+| Category | Examples |
+|---|---|
+| Cafe / Coffee | Starbucks, Teavana, Nespresso, espresso-named brands |
+| Bakery | Gail's, Paul Bakery, Patisserie Valerie |
+| Sandwich / Deli | Pret A Manger, EAT, Upper Crust |
+| Fast Food | McDonald's, Burger King, Popeyes |
+| Restaurant | Leon, Wagamama |
+| Juice / Health | Crussh, Benugo Juice |
+| Retail / Other | Holdings, media, entertainment entities |
+| Food & Beverage | Fallback for anything unmatched |
+
+The `entity_type` column appears in the data table. In the visual map, subsidiaries classified as **Cafe / Coffee** receive the same bold blue underline as actual London cafe locations — all other subsidiaries get a hue-coloured underline based on their parent's industry.
+
+---
+
+### Stage 7 — Final DataFrame
+
+Everything is joined into a single enriched DataFrame — one row per cafe location — with columns for brand, entity type, parent, ticker, price, market cap, rating, review count, and location count. This is the source of truth for both the table and the visual mapping.
 
 ---
 
@@ -109,6 +128,10 @@ The ownership tree is rendered using [Markmap](https://markmap.js.org/) (a D3-ba
 - Brands that ARE their parent (e.g. Greggs/Greggs plc) collapse to a single node — no redundant parent edge
 - Real ownership edges (e.g. `McCafé → McDonald's Corporation`, `Costa Coffee → Coca-Cola`) show the parent as the `##` node with brands as `###` children
 - Ticker/price text is rendered at 70% size and 52% opacity so it doesn't compete with the brand name
+- **Bold blue underline** = actual London cafe locations (≥50% of Google Places records tagged `cafe`) OR subsidiaries classified as Cafe / Coffee
+- **Coloured underline** = non-cafe subsidiaries — colour determined by parent industry (see legend)
+- **No underline** = parent company nodes
+- Industry legend is shown at the right-middle of the map
 
 Pan with click-drag, zoom with scroll or the +/− buttons, and click any node to expand/collapse.
 
