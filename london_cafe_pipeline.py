@@ -104,7 +104,6 @@ BRAND_CANONICAL: dict[str, str] = {
 
 BRAND_TO_PARENT: dict[str, tuple[str, str | None]] = {
     # ── Listed parents ────────────────────────────────────────────
-    "Starbucks":           ("Starbucks Corporation",                "SBUX"),
     "Costa Coffee":        ("The Coca-Cola Company",                "KO"),
     "McCafé":              ("McDonald's Corporation",               "MCD"),
     "McDonald's":          ("McDonald's Corporation",               "MCD"),
@@ -114,6 +113,8 @@ BRAND_TO_PARENT: dict[str, tuple[str, str | None]] = {
     "JDE Peet":            ("JDE Peet's N.V.",                      "JDEP.AS"),
     "Nespresso":           ("Nestle S.A.",                          "NESN.SW"),
     "Blue Bottle":         ("Nestle S.A.",                          "NESN.SW"),
+    # SSP Group operates Starbucks under licence in UK travel hubs
+    "Starbucks":           ("SSP Group plc",                        "SSPG.L"),
     "Upper Crust":         ("SSP Group plc",                        "SSPG.L"),
     "Caffè Ritazza":       ("SSP Group plc",                        "SSPG.L"),
     "Caffe Ritazza":       ("SSP Group plc",                        "SSPG.L"),
