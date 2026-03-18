@@ -58,6 +58,7 @@ WIKI_BATCH      = 10    # titles per MediaWiki request
 # ─────────────────────────────────────────────────────────────────
 
 CHAIN_KEYWORDS: list[str] = [
+    # ── Major international chains ───────────────────────────────
     "Starbucks", "Costa Coffee", "Caffè Nero", "Caffe Nero",
     "Pret A Manger", "Pret", "McCafé", "McDonald's", "Greggs",
     "Tim Hortons", "Peet's Coffee", "JDE Peet", "Nespresso",
@@ -68,25 +69,43 @@ CHAIN_KEYWORDS: list[str] = [
     "Harris + Hoole", "Patisserie Valerie", "Itsu",
     "Boston Tea Party", "Aroma", "Lavazza", "EAT",
     "Blank Street", "Blank Street Coffee",
+    # ── London / UK independents with multiple sites ─────────────
+    "Joe & the Juice", "Joe and the Juice",
+    "Ole & Steen",
+    "WatchHouse", "Watch House",
+    "Grind",
+    "Caravan",
+    "Daisy Green",
+    "Notes Coffee",
+    "Workshop Coffee",
+    "Allpress Espresso", "Allpress",
+    "Ozone Coffee",
+    "Federation Coffee",
+    "Redemption Roasters",
+    "Origin Coffee",
+    "Milk Beach",
+    "Vagabond",
+    "Foxcroft & Ginger",
+    "Crussh",
 ]
 
 # Canonical brand names — short/variant forms collapse to the full official name.
 # Applied as a final step in normalise_brand so both API and scraped data benefit.
 BRAND_CANONICAL: dict[str, str] = {
-    "Pret":          "Pret A Manger",
-    "Gail's":        "Gail's Bakery",
-    "Caffe Nero":    "Caffè Nero",
-    "Caffe Ritazza": "Caffè Ritazza",
-    "Blank Street":  "Blank Street Coffee",
+    "Pret":                "Pret A Manger",
+    "Gail's":              "Gail's Bakery",
+    "Caffe Nero":          "Caffè Nero",
+    "Caffe Ritazza":       "Caffè Ritazza",
+    "Blank Street":        "Blank Street Coffee",
+    "Joe and the Juice":   "Joe & the Juice",
+    "Watch House":         "WatchHouse",
+    "Allpress":            "Allpress Espresso",
 }
 
 BRAND_TO_PARENT: dict[str, tuple[str, str | None]] = {
+    # ── Listed parents ────────────────────────────────────────────
     "Starbucks":           ("Starbucks Corporation",                "SBUX"),
     "Costa Coffee":        ("The Coca-Cola Company",                "KO"),
-    "Caffè Nero":          ("Caffè Nero Group Ltd",                 None),
-    "Caffe Nero":          ("Caffè Nero Group Ltd",                 None),
-    "Pret A Manger":       ("JAB Holding Company",                  None),
-    "Pret":                ("JAB Holding Company",                  None),
     "McCafé":              ("McDonald's Corporation",               "MCD"),
     "McDonald's":          ("McDonald's Corporation",               "MCD"),
     "Greggs":              ("Greggs plc",                           "GRG.L"),
@@ -95,16 +114,23 @@ BRAND_TO_PARENT: dict[str, tuple[str, str | None]] = {
     "JDE Peet":            ("JDE Peet's N.V.",                      "JDEP.AS"),
     "Nespresso":           ("Nestle S.A.",                          "NESN.SW"),
     "Blue Bottle":         ("Nestle S.A.",                          "NESN.SW"),
-    "Black Sheep Coffee":  ("Black Sheep Coffee Ltd",               None),
     "Upper Crust":         ("SSP Group plc",                        "SSPG.L"),
     "Caffè Ritazza":       ("SSP Group plc",                        "SSPG.L"),
     "Caffe Ritazza":       ("SSP Group plc",                        "SSPG.L"),
+    "Esquires Coffee":     ("Cooks Coffee Company Ltd",             "COOK.NZ"),
+    "Lavazza":             ("Luigi Lavazza S.p.A.",                 None),
+    # ── Private parents ───────────────────────────────────────────
+    "Caffè Nero":          ("Caffè Nero Group Ltd",                 None),
+    "Caffe Nero":          ("Caffè Nero Group Ltd",                 None),
+    "Pret A Manger":       ("JAB Holding Company",                  None),
+    "Pret":                ("JAB Holding Company",                  None),
+    "EAT":                 ("JAB Holding Company",                  None),
+    "Black Sheep Coffee":  ("Black Sheep Coffee Ltd",               None),
     "Gail's Bakery":       ("Gail's Bakery Ltd",                    None),
     "Gail's":              ("Gail's Bakery Ltd",                    None),
     "Leon":                ("Leon Restaurants Ltd",                  None),
     "Benugo":              ("Benugo Ltd",                           None),
     "AMT Coffee":          ("AMT Coffee Ltd",                       None),
-    "Esquires Coffee":     ("Cooks Coffee Company Ltd",             "COOK.NZ"),
     "Coffee Republic":     ("Coffee Republic Ltd",                  None),
     "Le Pain Quotidien":   ("LPQ International SA",                 None),
     "Paul Bakery":         ("Groupe Holder",                        None),
@@ -112,10 +138,29 @@ BRAND_TO_PARENT: dict[str, tuple[str, str | None]] = {
     "Patisserie Valerie":  ("Patisserie Holdings",                  None),
     "Itsu":                ("Itsu Limited",                         None),
     "Boston Tea Party":    ("Boston Tea Party Cafes Ltd",           None),
-    "EAT":                 ("JAB Holding Company",                  None),
-    "Lavazza":             ("Luigi Lavazza S.p.A.",                 None),
     "Blank Street":        ("Blank Street Coffee Ltd",              None),
     "Blank Street Coffee": ("Blank Street Coffee Ltd",              None),
+    # ── New London / UK chains ────────────────────────────────────
+    "Joe & the Juice":     ("Joe & the Juice ApS",                  None),
+    "Joe and the Juice":   ("Joe & the Juice ApS",                  None),
+    "Ole & Steen":         ("Lagkagehuset A/S",                     None),
+    "WatchHouse":          ("WatchHouse Coffee Ltd",                None),
+    "Watch House":         ("WatchHouse Coffee Ltd",                None),
+    "Grind":               ("Grind Coffee Bar Ltd",                 None),
+    "Caravan":             ("Caravan Restaurants Ltd",              None),
+    "Daisy Green":         ("Daisy Green Collection Ltd",           None),
+    "Notes Coffee":        ("Notes Coffee Roasters Ltd",            None),
+    "Workshop Coffee":     ("Workshop Coffee Co. Ltd",              None),
+    "Allpress Espresso":   ("Allpress Espresso Ltd",                None),
+    "Allpress":            ("Allpress Espresso Ltd",                None),
+    "Ozone Coffee":        ("Ozone Coffee Roasters Ltd",            None),
+    "Federation Coffee":   ("Federation Coffee Ltd",                None),
+    "Redemption Roasters": ("Redemption Roasters Ltd",              None),
+    "Origin Coffee":       ("Origin Coffee Ltd",                    None),
+    "Milk Beach":          ("Milk Beach Ltd",                       None),
+    "Vagabond":            ("Vagabond Wines Ltd",                   None),
+    "Foxcroft & Ginger":   ("Foxcroft & Ginger Ltd",                None),
+    "Crussh":              ("Crussh Fit Food Bar Ltd",               None),
 }
 
 # ─────────────────────────────────────────────────────────────────

@@ -683,20 +683,26 @@ with tab2:
         unsafe_allow_html=True,
     )
 
-    # Build deduplicated brand tree for the map
+    # Build deduplicated brand tree for the map.
+    # Only include rows with a recognised chain brand — independent cafes
+    # (brand=NaN) have no parent and would otherwise create a spurious
+    # "Private Listing" node in the tree.
     brand_groups: dict[str, dict] = {}
     for _, row in raw_df.iterrows():
+        raw_brand = row.get("brand")
+        if not raw_brand or str(raw_brand) in ("nan", "None", ""):
+            continue
         parent    = str(row.get("parent_company") or "")
         ticker    = str(row.get("ticker") or "")
         price     = row.get("price_usd")
         is_listed = bool(row.get("is_listed", False))
         if is_listed and ticker and ticker not in ("PRIVATE", "nan", "") and price is not None:
             label = f"{parent} ({ticker} ${float(price):.2f})"
-        elif parent and parent not in ("Independent", "nan", ""):
+        elif parent and parent not in ("Independent", "Private Listing", "nan", ""):
             label = f"{parent} (PRIVATE)"
         else:
-            label = "Private Listing (PRIVATE)"
-        brand   = str(row.get("brand") or row.get("name", ""))
+            continue   # skip anything still unresolved
+        brand   = str(raw_brand)
         mkt_cap = float(row.get("display_mktcap_bn") or row.get("market_cap_bn") or 0)
         is_sub  = str(row.get("business_status", "")) == "SUBSIDIARY"
         if label not in brand_groups:
