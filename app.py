@@ -15,6 +15,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from london_cafe_pipeline import (
+    CAFE_BRANDS,
     build_enriched_df,
     clear_places_cache,
     demo_places,
@@ -818,13 +819,13 @@ with tab2:
 
     colour_map_json = json.dumps({p: parent_hue[p] for p in sorted_parents})
 
-    # cafe_brands: actual London cafes (not Wikipedia subsidiaries)
-    # loc_count:   how many locations each cafe brand has (for edge width)
+    # cafe_brands: brands that are genuine cafes (per CAFE_BRANDS set),
+    # used to drive bold blue underlines in the visual mapping.
     cafe_brands_list = [
         brand
         for brands in brand_groups.values()
         for brand, info in brands.items()
-        if not info["is_sub"]
+        if not info["is_sub"] and brand in CAFE_BRANDS
     ]
     loc_count_map: dict[str, int] = {}
     for _, _row in raw_df.iterrows():

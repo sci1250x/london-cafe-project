@@ -89,6 +89,24 @@ CHAIN_KEYWORDS: list[str] = [
     "Crussh",
 ]
 
+# Brands that are genuine cafes/coffee shops — used in app.py to decide
+# which nodes get bold blue underlines in the visual mapping.
+# Excludes food chains that happen to serve coffee (Upper Crust, Leon, etc.)
+CAFE_BRANDS: set[str] = {
+    "Starbucks", "Costa Coffee", "Caffè Nero", "Pret A Manger",
+    "McCafé", "Tim Hortons", "Peet's Coffee", "Nespresso",
+    "Blue Bottle", "Black Sheep Coffee", "Caffè Ritazza",
+    "Gail's Bakery", "Benugo", "AMT Coffee", "Esquires Coffee",
+    "Coffee Republic", "Le Pain Quotidien", "Harris + Hoole",
+    "Boston Tea Party", "Lavazza", "EAT", "Blank Street Coffee",
+    "Joe & the Juice", "Ole & Steen", "WatchHouse", "Grind",
+    "Caravan", "Daisy Green", "Notes Coffee", "Workshop Coffee",
+    "Allpress Espresso", "Ozone Coffee", "Federation Coffee",
+    "Redemption Roasters", "Origin Coffee", "Milk Beach",
+    "Foxcroft & Ginger", "Crussh", "Patisserie Valerie",
+    "Aroma", "Paul Bakery",
+}
+
 # Canonical brand names — short/variant forms collapse to the full official name.
 # Applied as a final step in normalise_brand so both API and scraped data benefit.
 BRAND_CANONICAL: dict[str, str] = {
