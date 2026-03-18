@@ -537,6 +537,12 @@ def build_brand_table(df: pd.DataFrame) -> pd.DataFrame:
         .merge(location_counts, on="name", how="left")
     )
 
+    # Drop subsidiary rows whose name already appears as a chain brand
+    # (e.g. Tim Hortons is both a London cafe and a Wikipedia subsidiary of RBI)
+    if not grouped.empty:
+        chain_names = set(grouped["name"].tolist())
+        subs = subs.loc[~subs["name"].isin(chain_names)]
+
     return (
         pd.concat([grouped, subs], ignore_index=True)
         .reset_index(drop=True)
@@ -734,8 +740,42 @@ with tab2:
         return (0, lbl)                                 # listed (have ticker)
 
     sorted_parents = sorted(brand_groups.keys(), key=_psort)
-    HUES = [210, 158, 28, 286, 338, 176, 56, 258, 14, 128, 50, 194]
-    parent_hue = {p: HUES[i % len(HUES)] for i, p in enumerate(sorted_parents)}
+
+    # Assign hues by industry (data-driven, not per-parent)
+    _INDUSTRY_HUES = {
+        "Restaurants":                   210,   # blue
+        "Beverages - Non-Alcoholic":     172,   # teal
+        "Packaged Foods":                 32,   # amber
+        "Independent / Private":         272,   # purple
+    }
+    # Build parent_company → industry from raw_df
+    _pc_industry: dict[str, str] = {}
+    for _, _r in raw_df.iterrows():
+        _pc  = str(_r.get("parent_company") or "")
+        _ind = str(_r.get("industry") or "")
+        if _pc and _pc not in ("Independent", "nan") and _ind not in ("None", "nan", ""):
+            _pc_industry[_pc] = _ind
+
+    def _parent_name(lbl: str) -> str:
+        return _re.sub(r"\s*\([^)]+\)\s*$", "", lbl).strip()
+
+    label_industry: dict[str, str] = {}
+    for pl in sorted_parents:
+        ind = _pc_industry.get(_parent_name(pl), "Independent / Private")
+        label_industry[pl] = ind
+
+    parent_hue = {
+        pl: _INDUSTRY_HUES.get(label_industry[pl], 272)
+        for pl in sorted_parents
+    }
+
+    # industry_colors: {industry_name: hue} for the legend
+    industry_colors: dict[str, int] = {}
+    for pl in sorted_parents:
+        ind = label_industry[pl]
+        if ind not in industry_colors:
+            industry_colors[ind] = parent_hue[pl]
+    industry_colors_json = json.dumps(industry_colors)
 
     import re as _re
     _corp_re = _re.compile(
@@ -857,13 +897,14 @@ html, body {{ width: 100%; height: {HEIGHT}px; overflow: hidden; font-family: 'S
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/markmap-autoloader@latest"></script>
 <script>
-const dark        = window.matchMedia('(prefers-color-scheme: dark)').matches;
-const colMap      = {colour_map_json};
-const subParent   = {sub_parent_json};   // {{subBrand: parentLabel}}
-const cafeParent  = {cafe_parent_json};  // {{cafeBrand: parentLabel}}
-const cafeSet     = new Set({cafe_brands_json});
-const text        = dark ? '#e6e3db' : '#111111';
-const CAFE_BLUE   = dark ? '#60a5fa' : '#2563eb';
+const dark          = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const colMap        = {colour_map_json};
+const subParent     = {sub_parent_json};       // {{subBrand: parentLabel}}
+const cafeParent    = {cafe_parent_json};      // {{cafeBrand: parentLabel}}
+const cafeSet       = new Set({cafe_brands_json});
+const industryColors = {industry_colors_json}; // {{industry: hue}}
+const text          = dark ? '#e6e3db' : '#111111';
+const CAFE_BLUE     = dark ? '#60a5fa' : '#2563eb';
 
 document.body.style.background = dark ? '#0d0f16' : '#f7f7fa';
 
@@ -915,8 +956,8 @@ function styleNodes(svg) {{
       el.style.textDecorationColor    = hsl(hue, 62, dark ? 58 : 44);
       el.style.textDecorationThickness = '1.5px';
     }} else {{
-      // Parent node
-      el.style.fontWeight    = '600';
+      // Parent node — normal weight, no underline
+      el.style.fontWeight     = '400';
       el.style.textDecoration = 'none';
     }}
   }});
@@ -976,25 +1017,23 @@ function buildLegend() {{
   let html = `<div style="font-size:10px;font-weight:700;text-transform:uppercase;
     letter-spacing:.10em;color:${{dim}};margin-bottom:10px">Legend</div>`;
 
-  // Cafe chain row
+  // Cafe chain row (always first)
   html += `<div style="display:flex;align-items:center;gap:9px;margin-bottom:9px;
     padding-bottom:9px;border-bottom:1px solid ${{sep}}">
     <span style="font-size:13px;color:${{CAFE_BLUE}}">━</span>
     <span style="font-weight:700;color:${{col}};font-size:11px;
       text-decoration:underline;text-decoration-color:${{CAFE_BLUE}};
-      text-underline-offset:2px;text-decoration-thickness:2px">London Cafe</span>
+      text-underline-offset:2px;text-decoration-thickness:2px">London Cafe Chain</span>
   </div>`;
 
-  // One row per parent company
-  for (const [lbl, hue] of Object.entries(colMap)) {{
-    let name = lbl.replace(/\\s*\\([^)]+\\)\\s*$/, '').trim();
-    if (name.length > 27) name = name.substring(0, 25) + '…';
+  // One row per industry
+  for (const [industry, hue] of Object.entries(industryColors)) {{
     const c = hsl(hue, 62, dark ? 58 : 44);
     html += `<div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
       <span style="font-size:13px;color:${{c}}">━</span>
       <span style="color:${{col}};font-size:11px;
         text-decoration:underline;text-decoration-color:${{c}};
-        text-underline-offset:2px;text-decoration-thickness:1.5px">${{name}}</span>
+        text-underline-offset:2px;text-decoration-thickness:1.5px">${{industry}}</span>
     </div>`;
   }}
   leg.innerHTML = html;
