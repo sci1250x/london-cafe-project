@@ -15,7 +15,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from london_cafe_pipeline import (
-    CAFE_BRANDS,
+    CAFE_BRANDS_OVERRIDE,
     build_enriched_df,
     clear_places_cache,
     demo_places,
@@ -819,13 +819,35 @@ with tab2:
 
     colour_map_json = json.dumps({p: parent_hue[p] for p in sorted_parents})
 
-    # cafe_brands: brands that are genuine cafes (per CAFE_BRANDS set),
-    # used to drive bold blue underlines in the visual mapping.
+    # Determine which brands are genuine cafes using Google Places types.
+    # Primary signal: if ≥50% of a brand's locations have "cafe" in their
+    # Google-assigned types, it's a cafe. This works automatically with real
+    # API data. CAFE_BRANDS_OVERRIDE handles edge cases where Google's types
+    # are inconsistent (e.g. Nespresso boutiques, Benugo, Pret).
+    _brand_cafe_counts: dict[str, list[int]] = {}  # [cafe_count, total]
+    for _, _r in raw_df.iterrows():
+        if str(_r.get("business_status", "")) == "SUBSIDIARY":
+            continue
+        _b = str(_r.get("brand") or "")
+        if not _b or _b in ("nan", "None", ""):
+            continue
+        _types = str(_r.get("types") or "").lower()
+        if _b not in _brand_cafe_counts:
+            _brand_cafe_counts[_b] = [0, 0]
+        _brand_cafe_counts[_b][1] += 1
+        if "cafe" in _types:
+            _brand_cafe_counts[_b][0] += 1
+
+    _cafe_type_brands: set[str] = {
+        b for b, (cafe_n, total_n) in _brand_cafe_counts.items()
+        if total_n > 0 and cafe_n / total_n >= 0.5
+    } | CAFE_BRANDS_OVERRIDE
+
     cafe_brands_list = [
         brand
         for brands in brand_groups.values()
         for brand, info in brands.items()
-        if not info["is_sub"] and brand in CAFE_BRANDS
+        if not info["is_sub"] and brand in _cafe_type_brands
     ]
     loc_count_map: dict[str, int] = {}
     for _, _row in raw_df.iterrows():

@@ -89,22 +89,14 @@ CHAIN_KEYWORDS: list[str] = [
     "Crussh",
 ]
 
-# Brands that are genuine cafes/coffee shops — used in app.py to decide
-# which nodes get bold blue underlines in the visual mapping.
-# Excludes food chains that happen to serve coffee (Upper Crust, Leon, etc.)
-CAFE_BRANDS: set[str] = {
-    "Starbucks", "Costa Coffee", "Caffè Nero", "Pret A Manger",
-    "McCafé", "Tim Hortons", "Peet's Coffee", "Nespresso",
-    "Blue Bottle", "Black Sheep Coffee", "Caffè Ritazza",
-    "Gail's Bakery", "Benugo", "AMT Coffee", "Esquires Coffee",
-    "Coffee Republic", "Le Pain Quotidien", "Harris + Hoole",
-    "Boston Tea Party", "Lavazza", "EAT", "Blank Street Coffee",
-    "Joe & the Juice", "Ole & Steen", "WatchHouse", "Grind",
-    "Caravan", "Daisy Green", "Notes Coffee", "Workshop Coffee",
-    "Allpress Espresso", "Ozone Coffee", "Federation Coffee",
-    "Redemption Roasters", "Origin Coffee", "Milk Beach",
-    "Foxcroft & Ginger", "Crussh", "Patisserie Valerie",
-    "Aroma", "Paul Bakery",
+# Override set: brands Google occasionally miscategorises but are genuine cafes.
+# The primary signal is the Google Places "types" field (if a location has
+# "cafe" in its types it counts as a cafe). This set handles edge cases only.
+CAFE_BRANDS_OVERRIDE: set[str] = {
+    "Nespresso",        # boutique stores — Google types vary
+    "Benugo",           # cafe-bars in galleries/museums
+    "Pret A Manger",    # Google sometimes tags as meal_takeaway only
+    "EAT",
 }
 
 # Canonical brand names — short/variant forms collapse to the full official name.
@@ -958,10 +950,10 @@ def demo_places() -> pd.DataFrame:
         {"place_id":"d09","name":"Tim Hortons / Leicester Square",  "address":"Leicester Sq, WC2",     "lat":51.5113,"lon":-0.1300,"rating":4.0,"review_count":540, "price_level":2,"business_status":"OPERATIONAL","types":"cafe"},
         {"place_id":"d10","name":"Black Sheep Coffee Shoreditch",   "address":"Curtain Rd, EC2",       "lat":51.5234,"lon":-0.0815,"rating":4.5,"review_count":430, "price_level":2,"business_status":"OPERATIONAL","types":"cafe"},
         {"place_id":"d11","name":"Nespresso Boutique Regent St",    "address":"Regent St, W1",         "lat":51.5101,"lon":-0.1382,"rating":4.6,"review_count":320, "price_level":3,"business_status":"OPERATIONAL","types":"cafe"},
-        {"place_id":"d12","name":"Upper Crust in St Pancras",       "address":"Euston Rd, NW1",        "lat":51.5313,"lon":-0.1233,"rating":3.5,"review_count":1500,"price_level":2,"business_status":"OPERATIONAL","types":"cafe"},
-        {"place_id":"d13","name":"Gail's Bakery Notting Hill",      "address":"Westbourne Gv, W11",    "lat":51.5152,"lon":-0.2002,"rating":4.5,"review_count":890, "price_level":2,"business_status":"OPERATIONAL","types":"bakery"},
+        {"place_id":"d12","name":"Upper Crust in St Pancras",       "address":"Euston Rd, NW1",        "lat":51.5313,"lon":-0.1233,"rating":3.5,"review_count":1500,"price_level":2,"business_status":"OPERATIONAL","types":"bakery|meal_takeaway|food"},
+        {"place_id":"d13","name":"Gail's Bakery Notting Hill",      "address":"Westbourne Gv, W11",    "lat":51.5152,"lon":-0.2002,"rating":4.5,"review_count":890, "price_level":2,"business_status":"OPERATIONAL","types":"bakery|cafe|food"},
         {"place_id":"d14","name":"The Neighbourhood Coffee",        "address":"Brixton Rd, SW9",       "lat":51.4624,"lon":-0.1133,"rating":4.7,"review_count":210, "price_level":2,"business_status":"OPERATIONAL","types":"cafe"},
-        {"place_id":"d15","name":"Leon Kings Cross",                "address":"King's Cross, N1",      "lat":51.5300,"lon":-0.1234,"rating":4.1,"review_count":610, "price_level":2,"business_status":"OPERATIONAL","types":"cafe"},
+        {"place_id":"d15","name":"Leon Kings Cross",                "address":"King's Cross, N1",      "lat":51.5300,"lon":-0.1234,"rating":4.1,"review_count":610, "price_level":2,"business_status":"OPERATIONAL","types":"restaurant|meal_takeaway|food"},
         {"place_id":"d16","name":"Pret - Paddington",               "address":"Praed St, W2",          "lat":51.5154,"lon":-0.1755,"rating":3.9,"review_count":720, "price_level":2,"business_status":"OPERATIONAL","types":"cafe"},
         {"place_id":"d17","name":"Blank Street Coffee Soho",        "address":"Berwick St, W1",        "lat":51.5132,"lon":-0.1342,"rating":4.6,"review_count":380, "price_level":2,"business_status":"OPERATIONAL","types":"cafe"},
         {"place_id":"d18","name":"Blank Street Coffee Canary Wharf","address":"Bank St, E14",          "lat":51.5042,"lon":-0.0190,"rating":4.5,"review_count":290, "price_level":2,"business_status":"OPERATIONAL","types":"cafe"},
